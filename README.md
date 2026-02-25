@@ -89,13 +89,33 @@ You can package Spackle as a standalone macOS `.app` using py2app:
 
 This creates `dist/Spackle.app`.
 
+## Building the RPM
+
+On Fedora, RHEL, or other RPM-based systems you can build an RPM package:
+
+```bash
+# Install build tools (once)
+sudo dnf install rpm-build
+
+# Build the RPM and SRPM
+./build_rpm.sh
+```
+
+Output is under `~/rpmbuild/`:
+- `~/rpmbuild/RPMS/noarch/spackle-2.0-1.<dist>.noarch.rpm` — install with `sudo dnf install ~/rpmbuild/RPMS/noarch/spackle-2.0-1.*.noarch.rpm`
+- `~/rpmbuild/SRPMS/spackle-2.0-1.<dist>.src.rpm` — source package
+
+The package installs `spackle` to `/usr/bin`, the desktop file to `/usr/share/applications/`, and the icon to `/usr/share/pixmaps/` (if `src/spackle/resources/Spackle-icon.png` is present). Dependencies: python3, python3-tkinter, openssh-clients, xterm.
+
 ## Project Structure
 
 ```
 spackle-ssh/
 ├── spackle.py           # Application source
 ├── build_macos_app.sh   # macOS .app build script (py2app)
+├── build_rpm.sh         # RPM build script (Fedora/RHEL)
 ├── install_linux.sh     # Linux install script (~/.local/)
+├── spackle.spec         # RPM spec file
 ├── spackle.desktop      # Freedesktop .desktop launcher template
 ├── setup.py             # py2app build configuration
 ├── src/spackle/resources/
