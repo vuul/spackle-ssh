@@ -10,7 +10,8 @@ A lightweight SSH/Telnet client for macOS and Linux, providing a GUI for managin
 - **Terminal customization** - foreground/background colors, font size, geometry (80x24, 80x43, 132x24, 132x43), and scrollback lines
 - **SSH key support** - use the default key (~/.ssh/id_rsa or ~/.ssh/id_dsa) or specify a custom path
 - **User@host parsing** - enter `user@hostname` or just a hostname (defaults to current user)
-- **Connection validation** - DNS lookup and port connectivity checks before launching
+- **Connection validation** - DNS lookup before launching
+- **macOS** - Shell runs `exit` after the SSH/telnet session ends
 
 ## Requirements
 
@@ -83,7 +84,7 @@ The script checks for required dependencies (python3, tkinter, xterm) and provid
 You can package Spackle as a standalone macOS `.app` using py2app:
 
 ```bash
-./build_app.sh
+./build_macos_app.sh
 ```
 
 This creates `dist/Spackle.app`.
