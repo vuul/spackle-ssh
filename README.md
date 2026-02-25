@@ -8,7 +8,7 @@ A lightweight SSH/Telnet client for macOS and Linux, providing a GUI for managin
 - **Native Terminal.app** integration on macOS (xterm on Linux)
 - **Session management** - save, load, and delete connection profiles
 - **Terminal customization** - foreground/background colors, font size, geometry (80x24, 80x43, 132x24, 132x43), and scrollback lines
-- **SSH key support** - use the default key (~/.ssh/id_rsa) or specify a custom path
+- **SSH key support** - use the default key (~/.ssh/id_rsa or ~/.ssh/id_dsa) or specify a custom path
 - **User@host parsing** - enter `user@hostname` or just a hostname (defaults to current user)
 - **Connection validation** - DNS lookup and port connectivity checks before launching
 
@@ -63,11 +63,24 @@ Click **Save as default** to persist your preferences across new sessions.
 
 Sessions are stored in `~/.spackle_2.0` using a Java-compatible properties format. This file is created automatically on first launch.
 
+## Building the macOS App Bundle
+
+You can package Spackle as a standalone macOS `.app` using py2app:
+
+```bash
+./build_app.sh
+```
+
+This creates `dist/Spackle.app`. The script requires a source icon at `src/spackle/resources/Spackle-icon.png` to generate the `.icns` file.
+
 ## Project Structure
 
 ```
-Spackle/
-├── spackle.py    # Application source
+spackle-ssh/
+├── spackle.py       # Application source
+├── build_app.sh     # macOS .app build script (py2app)
+├── setup.py         # py2app build configuration
+├── nbproject/       # Legacy NetBeans project files (from Java version)
 └── README.md
 ```
 
