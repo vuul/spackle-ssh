@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Spackle
+Comment=Lightweight SSH/Telnet client
+Exec=spackle
+Icon=spackle
+Categories=Network;Utility;
+Terminal=false
+StartupNotify=true

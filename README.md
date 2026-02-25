@@ -63,6 +63,21 @@ Click **Save as default** to persist your preferences across new sessions.
 
 Sessions are stored in `~/.spackle_2.0` using a Java-compatible properties format. This file is created automatically on first launch.
 
+## Linux Installation
+
+Install Spackle as a desktop application for the current user (no sudo required):
+
+```bash
+./install_linux.sh
+```
+
+This installs to `~/.local/`:
+- `~/.local/bin/spackle` — the application
+- `~/.local/share/icons/spackle.png` — the icon
+- `~/.local/share/applications/spackle.desktop` — the GNOME launcher
+
+The script checks for required dependencies (python3, tkinter, xterm) and provides install commands if any are missing.
+
 ## Building the macOS App Bundle
 
 You can package Spackle as a standalone macOS `.app` using py2app:
@@ -77,12 +92,14 @@ This creates `dist/Spackle.app`.
 
 ```
 spackle-ssh/
-├── spackle.py       # Application source
-├── build_app.sh     # macOS .app build script (py2app)
-├── setup.py         # py2app build configuration
+├── spackle.py           # Application source
+├── build_app.sh         # macOS .app build script (py2app)
+├── install_linux.sh     # Linux install script (~/.local/)
+├── spackle.desktop      # Freedesktop .desktop launcher template
+├── setup.py             # py2app build configuration
 ├── src/spackle/resources/
-│   └── Spackle-icon.png  # Application icon
-├── nbproject/       # Legacy NetBeans project files (from Java version)
+│   └── Spackle-icon.png # Application icon
+├── nbproject/           # Legacy NetBeans project files (from Java version)
 └── README.md
 ```
 
