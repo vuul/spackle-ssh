@@ -62,7 +62,7 @@ Click **Save as default** to persist your preferences across new sessions.
 
 ## Session Storage
 
-Sessions are stored in `~/.spackle_2.0` using a Java-compatible properties format. This file is created automatically on first launch.
+Sessions are stored in `~/.spackle_sessions.json` as JSON. The file is created on first launch.
 
 ## Linux Installation
 

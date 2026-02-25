@@ -7,12 +7,12 @@ Uses native Terminal.app on macOS; falls back to xterm on Linux.
 Author: vuul
 """
 
+import json
 import os
 import sys
 import socket
 import subprocess
 import shutil
-from datetime import datetime
 from pathlib import Path
 
 try:
@@ -42,48 +42,43 @@ APP_HOMEPAGE = "https://github.com/vuul/spackle-ssh"
 APP_DESCRIPTION = (
     "A Python based version of the popular PuTTY, but for Mac and Linux."
 )
-PREFS_FILE = os.path.join(str(Path.home()), ".spackle_2.0")
+SESSION_FILE = os.path.join(str(Path.home()), ".spackle_sessions.json")
 
 
-class SortedProperties:
-    """A simple Java-style properties file handler with sorted keys.
-    Maintains backward compatibility with the original Java properties file format."""
+def _rgb_int_to_hex(rgb_int_str):
+    """Convert numeric color (int string) to hex (#rrggbb)."""
+    try:
+        rgb = int(rgb_int_str)
+        if rgb < 0:
+            rgb += 2**32
+        r = (rgb >> 16) & 0xFF
+        g = (rgb >> 8) & 0xFF
+        b = rgb & 0xFF
+        return f"#{r:02x}{g:02x}{b:02x}"
+    except (ValueError, TypeError):
+        return "#000000"
 
-    def __init__(self):
-        self._props = {}
 
-    def get(self, key, default=None):
-        return self._props.get(key, default)
+def load_session_data(filepath=SESSION_FILE):
+    """Load session data from JSON."""
+    try:
+        with open(filepath, "r") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        data = {"version": 1, "default": {}, "sessions": []}
+    except json.JSONDecodeError:
+        data = {"version": 1, "default": {}, "sessions": []}
+    if "default" not in data:
+        data["default"] = {}
+    if "sessions" not in data:
+        data["sessions"] = []
+    return data
 
-    def set(self, key, value):
-        self._props[key] = str(value)
 
-    def remove(self, key):
-        self._props.pop(key, None)
-
-    def property_names(self):
-        return sorted(self._props.keys())
-
-    def load(self, filepath):
-        """Load properties from a Java-style properties file."""
-        try:
-            with open(filepath, "r") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    if "=" in line:
-                        key, _, value = line.partition("=")
-                        self._props[key.strip()] = value.strip()
-        except FileNotFoundError:
-            pass
-
-    def store(self, filepath):
-        """Save properties to a Java-style properties file."""
-        with open(filepath, "w") as f:
-            f.write(f"#\n#{datetime.now()}\n")
-            for key in sorted(self._props.keys()):
-                f.write(f"{key}={self._props[key]}\n")
+def save_session_data(data, filepath=SESSION_FILE):
+    """Save session data as JSON."""
+    with open(filepath, "w") as f:
+        json.dump(data, f, indent=2)
 
 
 class ConnectionProperties(tk.Toplevel):
@@ -461,7 +456,7 @@ class SpackleApp(tk.Tk):
         self._xterm_path = ""
         self._ssh_path = ""
         self._telnet_path = ""
-        self._sessions = SortedProperties()
+        self._session_data = {"version": 1, "default": {}, "sessions": []}
 
         # Connection properties dialog
         self._cp = ConnectionProperties(self)
@@ -663,68 +658,21 @@ class SpackleApp(tk.Tk):
 
     def _load_prefs(self):
         """Load preferences from file, creating defaults if needed."""
-        if not os.path.exists(PREFS_FILE):
-            Path(PREFS_FILE).touch()
+        self._session_data = load_session_data()
 
-        self._sessions.load(PREFS_FILE)
-
-        # Check if defaults exist
-        has_defaults = any(
-            name.startswith("default.")
-            for name in self._sessions.property_names()
-        )
-
-        if not has_defaults:
-            self._sessions.set(
-                "default.background",
-                self._color_to_rgb_int(
-                    self._cp.get_terminal_background_color()
-                ),
-            )
-            self._sessions.set(
-                "default.foreground",
-                self._color_to_rgb_int(
-                    self._cp.get_terminal_foreground_color()
-                ),
-            )
-            self._sessions.set("default.geometry", self._cp.get_geometry())
-            self._sessions.set(
-                "default.scrollback", self._cp.get_scrollback_lines()
-            )
-            self._sessions.set("default.keypath", "default")
-            self._sessions.set("default.fontsize", self._cp.get_font_size())
+        default = self._session_data["default"]
+        if not default:
+            default["geometry"] = self._cp.get_geometry()
+            default["scrollback"] = self._cp.get_scrollback_lines()
+            default["fontsize"] = self._cp.get_font_size()
+            default["keypath"] = "default"
+            default["background"] = self._cp.get_terminal_background_color()
+            default["foreground"] = self._cp.get_terminal_foreground_color()
             self._write_sessions()
         else:
             self._load_session("default")
 
         self._refresh_sessions()
-
-    @staticmethod
-    def _color_to_rgb_int(hex_color):
-        """Convert hex color (#rrggbb) to Java-compatible signed RGB int."""
-        hex_color = hex_color.lstrip("#")
-        r = int(hex_color[0:2], 16)
-        g = int(hex_color[2:4], 16)
-        b = int(hex_color[4:6], 16)
-        # Java Color.getRGB() returns signed 32-bit int with alpha=255
-        rgb = (255 << 24) | (r << 16) | (g << 8) | b
-        if rgb >= 2**31:
-            rgb -= 2**32
-        return str(rgb)
-
-    @staticmethod
-    def _rgb_int_to_hex(rgb_int_str):
-        """Convert Java-style signed RGB int to hex color (#rrggbb)."""
-        try:
-            rgb = int(rgb_int_str)
-            if rgb < 0:
-                rgb += 2**32
-            r = (rgb >> 16) & 0xFF
-            g = (rgb >> 8) & 0xFF
-            b = rgb & 0xFF
-            return f"#{r:02x}{g:02x}{b:02x}"
-        except (ValueError, TypeError):
-            return "#000000"
 
     def _launch_terminal(self):
         """Validate inputs, build the SSH/Telnet command, and open a terminal."""
@@ -868,68 +816,55 @@ end tell
     def _refresh_sessions(self):
         """Update the stored session list in the UI."""
         self._session_list.delete(0, tk.END)
-        names = []
-        for key in self._sessions.property_names():
-            if key.endswith(".name"):
-                val = self._sessions.get(key)
-                if val:
-                    names.append(val)
-        names.sort()
+        names = sorted(s["name"] for s in self._session_data["sessions"] if s.get("name"))
         for name in names:
             self._session_list.insert(tk.END, name)
 
     def _load_session(self, session_name):
         """Load a session's settings into the UI."""
-        s = session_name
+        if session_name == "default":
+            opts = self._session_data["default"]
+        else:
+            opts = None
+            for s in self._session_data["sessions"]:
+                if s.get("name") == session_name:
+                    opts = s
+                    break
+            if opts is None:
+                return
+            self._session_entry.delete(0, tk.END)
+            self._session_entry.insert(0, opts.get("name", ""))
+            self._hostname_entry.delete(0, tk.END)
+            self._hostname_entry.insert(0, opts.get("hostname", ""))
+            self._port_entry.delete(0, tk.END)
+            self._port_entry.insert(0, opts.get("port", ""))
+            mode = opts.get("mode", "ssh")
+            self._protocol_var.set("ssh" if mode == "ssh" else "telnet")
 
-        # name, hostname, port, and mode are NOT stored for "default"
-        if s != "default":
-            name = self._sessions.get(f"{s}.name")
-            if name:
-                self._session_entry.delete(0, tk.END)
-                self._session_entry.insert(0, name)
-            hostname = self._sessions.get(f"{s}.hostname")
-            if hostname:
-                self._hostname_entry.delete(0, tk.END)
-                self._hostname_entry.insert(0, hostname)
-            port = self._sessions.get(f"{s}.port")
-            if port:
-                self._port_entry.delete(0, tk.END)
-                self._port_entry.insert(0, port)
-            mode = self._sessions.get(f"{s}.mode")
-            if mode == "ssh":
-                self._protocol_var.set("ssh")
-            elif mode == "telnet":
-                self._protocol_var.set("telnet")
-
-        # These properties apply to both default and named sessions
-        geo = self._sessions.get(f"{s}.geometry")
+        if not opts:
+            return
+        geo = opts.get("geometry")
         if geo:
             self._cp.set_geometry(geo)
-
-        scrollback = self._sessions.get(f"{s}.scrollback")
-        if scrollback:
-            self._cp.set_scrollback_lines(scrollback)
-
-        fontsize = self._sessions.get(f"{s}.fontsize")
-        if fontsize:
-            self._cp.set_font_size(fontsize)
-
-        keypath = self._sessions.get(f"{s}.keypath")
+        scrollback = opts.get("scrollback")
+        if scrollback is not None:
+            self._cp.set_scrollback_lines(int(scrollback))
+        fontsize = opts.get("fontsize")
+        if fontsize is not None:
+            self._cp.set_font_size(int(fontsize))
+        keypath = opts.get("keypath")
         if keypath is None or keypath == "default":
             self._cp.default_key_set_selected()
             self._cp.set_key_path("")
         else:
             self._cp.other_key_set_selected()
             self._cp.set_key_path(keypath)
-
-        bg = self._sessions.get(f"{s}.background")
+        bg = opts.get("background")
         if bg:
-            self._cp.set_terminal_background_color(self._rgb_int_to_hex(bg))
-
-        fg = self._sessions.get(f"{s}.foreground")
+            self._cp.set_terminal_background_color(bg if bg.startswith("#") else _rgb_int_to_hex(bg))
+        fg = opts.get("foreground")
         if fg:
-            self._cp.set_terminal_foreground_color(self._rgb_int_to_hex(fg))
+            self._cp.set_terminal_foreground_color(fg if fg.startswith("#") else _rgb_int_to_hex(fg))
 
     def _load_selected_session(self):
         """Load the currently selected session from the list."""
@@ -956,30 +891,25 @@ end tell
             )
             return
 
-        s = session_name
-        self._sessions.set(f"{s}.name", session_name)
-        self._sessions.set(f"{s}.hostname", hostname)
-        self._sessions.set(f"{s}.mode", mode)
-        self._sessions.set(f"{s}.port", port)
-        self._sessions.set(
-            f"{s}.background",
-            self._color_to_rgb_int(self._cp.get_terminal_background_color()),
-        )
-        self._sessions.set(
-            f"{s}.foreground",
-            self._color_to_rgb_int(self._cp.get_terminal_foreground_color()),
-        )
-        self._sessions.set(f"{s}.geometry", self._cp.get_geometry())
-        self._sessions.set(
-            f"{s}.scrollback", self._cp.get_scrollback_lines()
-        )
-        self._sessions.set(f"{s}.fontsize", self._cp.get_font_size())
-
-        if self._cp.other_key_is_selected():
-            self._sessions.set(f"{s}.keypath", self._cp.get_key_path())
-        elif self._cp.default_key_is_selected():
-            self._sessions.set(f"{s}.keypath", "default")
-
+        session = {
+            "name": session_name,
+            "hostname": hostname,
+            "port": port,
+            "mode": mode,
+            "geometry": self._cp.get_geometry(),
+            "scrollback": self._cp.get_scrollback_lines(),
+            "fontsize": self._cp.get_font_size(),
+            "keypath": self._cp.get_key_path() if self._cp.other_key_is_selected() else "default",
+            "background": self._cp.get_terminal_background_color(),
+            "foreground": self._cp.get_terminal_foreground_color(),
+        }
+        sessions = self._session_data["sessions"]
+        for i, s in enumerate(sessions):
+            if s.get("name") == session_name:
+                sessions[i] = session
+                break
+        else:
+            sessions.append(session)
         self._write_sessions()
         self._refresh_sessions()
 
@@ -993,41 +923,27 @@ end tell
             return
 
         name = self._session_list.get(selection[0])
-        for suffix in [
-            ".background", ".foreground", ".hostname", ".mode",
-            ".name", ".port", ".geometry", ".keypath",
-            ".scrollback", ".fontsize",
-        ]:
-            self._sessions.remove(name + suffix)
-
+        self._session_data["sessions"] = [
+            s for s in self._session_data["sessions"] if s.get("name") != name
+        ]
         self._write_sessions()
         self._refresh_sessions()
 
     def _write_sessions(self):
-        """Persist sessions to the preferences file."""
-        self._sessions.store(PREFS_FILE)
+        """Persist sessions to the JSON file."""
+        save_session_data(self._session_data)
 
     def _save_defaults(self):
         """Save current properties as the default session settings."""
-        self._sessions.set(
-            "default.background",
-            self._color_to_rgb_int(self._cp.get_terminal_background_color()),
+        default = self._session_data["default"]
+        default["background"] = self._cp.get_terminal_background_color()
+        default["foreground"] = self._cp.get_terminal_foreground_color()
+        default["geometry"] = self._cp.get_geometry()
+        default["scrollback"] = self._cp.get_scrollback_lines()
+        default["fontsize"] = self._cp.get_font_size()
+        default["keypath"] = (
+            self._cp.get_key_path() if self._cp.other_key_is_selected() else "default"
         )
-        self._sessions.set(
-            "default.foreground",
-            self._color_to_rgb_int(self._cp.get_terminal_foreground_color()),
-        )
-        self._sessions.set("default.geometry", self._cp.get_geometry())
-        self._sessions.set(
-            "default.scrollback", self._cp.get_scrollback_lines()
-        )
-        self._sessions.set("default.fontsize", self._cp.get_font_size())
-
-        if self._cp.other_key_is_selected():
-            self._sessions.set("default.keypath", self._cp.get_key_path())
-        elif self._cp.default_key_is_selected():
-            self._sessions.set("default.keypath", "default")
-
         self._write_sessions()
 
     def _show_properties(self):
