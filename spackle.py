@@ -10,7 +10,6 @@ Author: vuul
 import os
 import sys
 import socket
-import ssl
 import subprocess
 import shutil
 from datetime import datetime
@@ -778,10 +777,7 @@ class SpackleApp(tk.Tk):
                 return
 
             # DNS check
-            socket.gethostbyname(hostname)
-
-            # Port connectivity check
-            self._check_port(hostname, int(port))
+            socket.getaddrinfo(hostname, int(port), socket.AF_UNSPEC, socket.SOCK_STREAM)
 
             # Launch using platform-appropriate terminal
             if sys.platform == "darwin":
@@ -801,7 +797,9 @@ class SpackleApp(tk.Tk):
             messagebox.showerror("Spackle", f"E105 IOException: {e}")
 
     def _open_macos_terminal(self, launch_cmd, title, geometry):
-        """Open a new Terminal.app window via AppleScript with custom settings."""
+        """Open a new Terminal.app window via AppleScript with custom settings.
+        Runs exit after the SSH/telnet session ends."""
+        launch_cmd = launch_cmd + " ; exit"
         cols, rows = geometry.split("x")
         font_size = self._cp.get_font_size()
 
@@ -866,30 +864,6 @@ end tell
         subprocess.Popen(
             cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
-
-    @staticmethod
-    def _check_port(hostname, port):
-        """Test that the specified port is open on the remote host."""
-        try:
-            context = ssl.create_default_context()
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-            sock = context.wrap_socket(
-                socket.socket(socket.AF_INET, socket.SOCK_STREAM),
-                server_hostname=hostname,
-            )
-            sock.settimeout(5)
-            sock.connect((hostname, port))
-            sock.close()
-        except ssl.SSLError:
-            # SSL handshake may fail but the port is open if we got this far
-            pass
-        except Exception:
-            # Fallback: try a plain socket connection
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(5)
-            sock.connect((hostname, port))
-            sock.close()
 
     def _refresh_sessions(self):
         """Update the stored session list in the UI."""
