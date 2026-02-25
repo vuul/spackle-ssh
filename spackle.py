@@ -475,9 +475,18 @@ class SpackleApp(tk.Tk):
         self._load_prefs()
 
         # Locate commands (xterm only needed on Linux; macOS uses Terminal.app)
-        try:
-            if sys.platform != "darwin":
+        if sys.platform != "darwin":
+            try:
                 self._xterm_path = self._locate_command("xterm")
+            except FileNotFoundError:
+                msg = "E100 xterm not found on the system."
+                if shutil.which("apt"):
+                    msg += "\n\nInstall it with:  sudo apt install xterm"
+                elif shutil.which("dnf"):
+                    msg += "\n\nInstall it with:  sudo dnf install xterm"
+                messagebox.showerror("Spackle", msg)
+
+        try:
             self._ssh_path = self._locate_command("ssh")
         except FileNotFoundError as e:
             messagebox.showerror("Error", f"E100 {e}")
