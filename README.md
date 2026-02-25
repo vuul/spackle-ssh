@@ -94,13 +94,12 @@ This creates `dist/Spackle.app`.
 ```
 spackle-ssh/
 ├── spackle.py           # Application source
-├── build_app.sh         # macOS .app build script (py2app)
+├── build_macos_app.sh   # macOS .app build script (py2app)
 ├── install_linux.sh     # Linux install script (~/.local/)
 ├── spackle.desktop      # Freedesktop .desktop launcher template
 ├── setup.py             # py2app build configuration
 ├── src/spackle/resources/
 │   └── Spackle-icon.png # Application icon
-├── nbproject/           # Legacy NetBeans project files (from Java version)
 └── README.md
 ```
 
