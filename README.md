@@ -2,7 +2,7 @@
 
 A lightweight SSH/Telnet client for macOS and Linux, providing a GUI for managing and launching terminal sessions.
 
-![MacOS screenshot](spackle-mac-screenshot.png)
+![MacOS screenshot](spackle-mac-screenshot.jpg)
 
 ## Features
 
