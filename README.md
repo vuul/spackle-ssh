@@ -125,4 +125,4 @@ spackle-ssh/
 
 ## History
 
-Spackle was originally created as a Java Swing application to provide a cross-platform PuTTY alternative for macOS and Linux. Version 2.0 is a complete rewrite in Python using tkinter, replacing the xterm dependency on macOS with native Terminal.app integration via AppleScript.
+Spackle was originally created as a [Java Swing application](https://sourceforge.net/projects/spackle-ssh/) to provide a cross-platform PuTTY alternative for macOS and Linux. Version 2.0 is a complete rewrite in Python using tkinter, replacing the xterm dependency on macOS with native Terminal.app integration via AppleScript.
