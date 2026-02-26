@@ -64,14 +64,10 @@ def load_session_data(filepath=SESSION_FILE):
     try:
         with open(filepath, "r") as f:
             data = json.load(f)
-    except FileNotFoundError:
+    except (FileNotFoundError, json.JSONDecodeError):
         data = {"version": 1, "default": {}, "sessions": []}
-    except json.JSONDecodeError:
-        data = {"version": 1, "default": {}, "sessions": []}
-    if "default" not in data:
-        data["default"] = {}
-    if "sessions" not in data:
-        data["sessions"] = []
+    data.setdefault("default", {})
+    data.setdefault("sessions", [])
     return data
 
 
@@ -162,7 +158,7 @@ class ConnectionProperties(tk.Toplevel):
             borderwidth=2,
         )
         self._fg_label.pack(side=tk.LEFT, padx=5)
-        self._fg_label.bind("<Button-1>", self._choose_foreground)
+        self._fg_label.bind("<Button-1>", lambda e: self._choose_color("fg"))
 
         ttk.Label(color_row, text="Background:").pack(
             side=tk.LEFT, padx=(20, 0)
@@ -176,7 +172,7 @@ class ConnectionProperties(tk.Toplevel):
             borderwidth=2,
         )
         self._bg_label.pack(side=tk.LEFT, padx=5)
-        self._bg_label.bind("<Button-1>", self._choose_background)
+        self._bg_label.bind("<Button-1>", lambda e: self._choose_color("bg"))
 
         # --- Size and Font row ---
         size_font_row = ttk.Frame(options_frame)
@@ -272,21 +268,15 @@ class ConnectionProperties(tk.Toplevel):
         else:
             self._key_choice.set("default")
 
-    def _choose_foreground(self, event=None):
-        color = colorchooser.askcolor(
-            color=self._fg_color, title="Choose foreground color"
-        )
+    def _choose_color(self, which):
+        """Choose foreground (which='fg') or background (which='bg') color."""
+        color_attr = "_fg_color" if which == "fg" else "_bg_color"
+        label_attr = "_fg_label" if which == "fg" else "_bg_label"
+        title = "Choose foreground color" if which == "fg" else "Choose background color"
+        color = colorchooser.askcolor(color=getattr(self, color_attr), title=title)
         if color[1]:
-            self._fg_color = color[1]
-            self._fg_label.configure(bg=self._fg_color)
-
-    def _choose_background(self, event=None):
-        color = colorchooser.askcolor(
-            color=self._bg_color, title="Choose background color"
-        )
-        if color[1]:
-            self._bg_color = color[1]
-            self._bg_label.configure(bg=self._bg_color)
+            setattr(self, color_attr, color[1])
+            getattr(self, label_attr).configure(bg=color[1])
 
     def _reset(self):
         self._key_choice.set("default")
@@ -816,22 +806,21 @@ end tell
     def _refresh_sessions(self):
         """Update the stored session list in the UI."""
         self._session_list.delete(0, tk.END)
-        names = sorted(s["name"] for s in self._session_data["sessions"] if s.get("name"))
-        for name in names:
+        for name in sorted(s["name"] for s in self._session_data["sessions"] if s.get("name")):
             self._session_list.insert(tk.END, name)
 
-    def _load_session(self, session_name):
-        """Load a session's settings into the UI."""
+    def _get_session_opts(self, session_name):
+        """Return options dict for 'default' or named session, or None if not found."""
         if session_name == "default":
-            opts = self._session_data["default"]
-        else:
-            opts = None
-            for s in self._session_data["sessions"]:
-                if s.get("name") == session_name:
-                    opts = s
-                    break
-            if opts is None:
-                return
+            return self._session_data["default"]
+        for s in self._session_data["sessions"]:
+            if s.get("name") == session_name:
+                return s
+        return None
+
+    def _apply_session_opts_to_ui(self, opts):
+        """Apply a session options dict to the connection form and options dialog."""
+        if opts.get("name") is not None:
             self._session_entry.delete(0, tk.END)
             self._session_entry.insert(0, opts.get("name", ""))
             self._hostname_entry.delete(0, tk.END)
@@ -840,18 +829,12 @@ end tell
             self._port_entry.insert(0, opts.get("port", ""))
             mode = opts.get("mode", "ssh")
             self._protocol_var.set("ssh" if mode == "ssh" else "telnet")
-
-        if not opts:
-            return
-        geo = opts.get("geometry")
-        if geo:
-            self._cp.set_geometry(geo)
-        scrollback = opts.get("scrollback")
-        if scrollback is not None:
-            self._cp.set_scrollback_lines(int(scrollback))
-        fontsize = opts.get("fontsize")
-        if fontsize is not None:
-            self._cp.set_font_size(int(fontsize))
+        if opts.get("geometry"):
+            self._cp.set_geometry(opts["geometry"])
+        if opts.get("scrollback") is not None:
+            self._cp.set_scrollback_lines(int(opts["scrollback"]))
+        if opts.get("fontsize") is not None:
+            self._cp.set_font_size(int(opts["fontsize"]))
         keypath = opts.get("keypath")
         if keypath is None or keypath == "default":
             self._cp.default_key_set_selected()
@@ -859,12 +842,19 @@ end tell
         else:
             self._cp.other_key_set_selected()
             self._cp.set_key_path(keypath)
-        bg = opts.get("background")
-        if bg:
-            self._cp.set_terminal_background_color(bg if bg.startswith("#") else _rgb_int_to_hex(bg))
-        fg = opts.get("foreground")
-        if fg:
-            self._cp.set_terminal_foreground_color(fg if fg.startswith("#") else _rgb_int_to_hex(fg))
+        if opts.get("background"):
+            c = opts["background"]
+            self._cp.set_terminal_background_color(c if c.startswith("#") else _rgb_int_to_hex(c))
+        if opts.get("foreground"):
+            c = opts["foreground"]
+            self._cp.set_terminal_foreground_color(c if c.startswith("#") else _rgb_int_to_hex(c))
+
+    def _load_session(self, session_name):
+        """Load a session's settings into the UI."""
+        opts = self._get_session_opts(session_name)
+        if opts is None:
+            return
+        self._apply_session_opts_to_ui(opts)
 
     def _load_selected_session(self):
         """Load the currently selected session from the list."""
@@ -913,6 +903,11 @@ end tell
         self._write_sessions()
         self._refresh_sessions()
 
+    def _set_port(self, port):
+        """Set the port entry to the given value."""
+        self._port_entry.delete(0, tk.END)
+        self._port_entry.insert(0, str(port))
+
     def _delete_session(self):
         """Delete the currently selected session."""
         selection = self._session_list.curselection()
@@ -954,12 +949,9 @@ end tell
 
     def _on_ssh_selected(self):
         if not self._ssh_path:
-            messagebox.showerror(
-                "Spackle", "E101 SSH not found on the system."
-            )
+            messagebox.showerror("Spackle", "E101 SSH not found on the system.")
             return
-        self._port_entry.delete(0, tk.END)
-        self._port_entry.insert(0, "22")
+        self._set_port(22)
 
     def _on_telnet_selected(self):
         if not self._telnet_path:
@@ -968,8 +960,7 @@ end tell
                 msg += "\n\nInstall it with:  brew install telnet"
             messagebox.showerror("Spackle", msg)
             return
-        self._port_entry.delete(0, tk.END)
-        self._port_entry.insert(0, "23")
+        self._set_port(23)
 
     def _on_list_double_click(self, event):
         """Double-click loads and launches the selected session."""
